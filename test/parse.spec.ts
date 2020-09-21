@@ -1,9 +1,11 @@
 import should from "should";
-import { CliTest } from "../src/clitest";
+import { createCliTest } from "../src/clitest";
 import { readString } from "./testlib";
 
-describe("parseFile", () => {
-    const dt = new CliTest({ filepath: "" });
+describe("parseFile", async () => {
+    const dt = await createCliTest({ filepath: "" });
+
+    after(() => dt.cleanup());
 
     it("should parse command", async () => {
         const md = [

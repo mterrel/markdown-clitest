@@ -58,6 +58,7 @@
     "debug": "^4.1.0",
     "fs-extra": "^8.1.0",
     "json5": "^2.1.1",
+    "p-defer": "^3.0.0",
     "source-map-support": "^0.5.16",
     "ts-custom-error": "^3.1.1",
     "tslib": "^2.0.0",

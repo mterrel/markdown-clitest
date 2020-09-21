@@ -1,12 +1,18 @@
 import should from "should";
 import { runActions } from "../../src/actions";
-import { CliTest } from "../../src/clitest";
+import { CliTest, createCliTest } from "../../src/clitest";
 import { readString } from "../testlib";
 
 describe("command action", () => {
+    let dt: CliTest | undefined;
+
+    afterEach(async () => {
+        if (dt) await dt.cleanup();
+        dt = undefined;
+    });
 
     it("should error on non-zero command exit", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -26,7 +32,7 @@ foo
     });
 
     it("should work correctly with comments in command", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",

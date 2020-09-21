@@ -1,15 +1,22 @@
 import should from "should";
 import { Action, runActions } from "../../src/actions";
 import { checkOutput } from "../../src/actions/output";
-import { CliTest } from "../../src/clitest";
+import { CliTest, createCliTest } from "../../src/clitest";
 import { readString } from "../testlib";
 
 describe("output action", () => {
     const actionLineNum = 1;
     const filename = "file.md";
+    let dt: CliTest | undefined;
+
+    afterEach(async () => {
+        if (dt) await dt.cleanup();
+        dt = undefined;
+    });
+
 
     it("should error with no output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "output",
             filename,
@@ -22,7 +29,7 @@ describe("output action", () => {
     });
 
     it("should error with invalid regex", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "output",
             filename,
@@ -35,7 +42,7 @@ describe("output action", () => {
     });
 
     it("should error with invalid regex flags", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "output",
             filename,
@@ -48,7 +55,7 @@ describe("output action", () => {
     });
 
     it("should error if match fails", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "output",
             filename,
@@ -64,7 +71,7 @@ Output:
     });
 
     it("should error if previous command isn't output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             '<!-- doctest output { matchRegex: "foo" } -->',
@@ -76,7 +83,7 @@ Output:
     });
 
     it("should validate output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -91,7 +98,7 @@ Output:
     });
 
     it("should validate output from stderr", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -106,7 +113,7 @@ Output:
     });
 
     it("should validate mixed output from stdout and stderr", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -121,7 +128,7 @@ Output:
     });
 
     it("should validate exact output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -136,7 +143,7 @@ Output:
     });
 
     it("should allow setting regex flags", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",
@@ -151,7 +158,7 @@ Output:
     });
 
     it("should fail on non-match", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             "<!-- doctest command -->",

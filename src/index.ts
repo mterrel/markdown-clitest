@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import path from "path";
 import { isError } from "util";
 import { runActions } from "./actions";
-import { CliTest, Options } from "./clitest";
+import { CliTest, createCliTest, Options } from "./clitest";
 import { parseFile } from "./parse";
 import { readFile } from "./readFile";
 
@@ -74,8 +74,7 @@ async function testFile(dt: CliTest, file: string) {
 
 async function main() {
     const opts = parseArgs();
-    const dt = new CliTest(opts);
-    await dt.init();
+    const dt = await createCliTest(opts);
 
     try {
         if (await isDir(opts.filepath)) {

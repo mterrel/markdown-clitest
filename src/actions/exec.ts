@@ -1,5 +1,4 @@
 import db from "debug";
-import execa from "execa";
 import { CliTest, ConfirmAction } from "../clitest";
 import { ActionError } from "../error";
 import { Action } from "./action";
@@ -7,18 +6,12 @@ import { checkOutput } from "./output";
 
 const debugOutput = db("clitest:output");
 
-export async function exec(dt: CliTest, action: Action, lastOutput: string | undefined) {
+export async function exec(dt: CliTest, action: Action, _lastOutput: string | undefined) {
     const cmd = action.params.cmd;
     let cmdStr: string;
-    let toExec: string;
-    let args: string[];
-    let shell = false;
 
     if (typeof cmd === "string" && cmd.length > 0) {
         cmdStr = cmd;
-        toExec = cmd;
-        args = [];
-        shell = true;
 
     } else if (Array.isArray(cmd)) {
         if (cmd.length === 0) {
@@ -30,8 +23,6 @@ export async function exec(dt: CliTest, action: Action, lastOutput: string | und
             }
         }
         cmdStr = cmd.join(" ");
-        toExec = cmd[0];
-        args = cmd.slice(1);
 
     } else {
         throw new ActionError(action, `Action 'exec' has invalid cmd parameter '${cmd}'. Must be string or array of string.`);
@@ -45,33 +36,16 @@ export async function exec(dt: CliTest, action: Action, lastOutput: string | und
         return;
     }
 
+    /* FIXME
     const env = {
         ...dt.cmdEnv,
         CLITEST_LAST_OUTPUT: lastOutput,
     };
+    */
+    const output = dt.interactive() || debugOutput.enabled;
 
     try {
-        const pRet = execa(toExec, args, {
-            all: true,
-            cwd: dt.cwd,
-            env,
-            shell,
-            stripFinalNewline: false,
-        });
-
-        if (pRet.stdout == null) {
-            throw new Error(`execa stdout stream is null??`);
-        }
-        if (pRet.stderr == null) {
-            throw new Error(`execa stdout stream is null??`);
-        }
-
-        if (dt.interactive() || debugOutput.enabled) {
-            pRet.stderr.pipe(process.stderr);
-            pRet.stdout.pipe(process.stdout);
-        }
-
-        const ret = await pRet;
+        const ret = await dt.command(cmdStr, { output });
 
         if (action.params.matchRegex) {
             await checkOutput(dt, action, ret.all);

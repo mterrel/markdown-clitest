@@ -1,10 +1,12 @@
-import { UserError } from "@adpt/utils";
+import { InternalError, UserError } from "@adpt/utils";
 import chalk from "chalk";
 import db from "debug";
 import fs from "fs-extra";
 import os from "os";
 import path from "path";
 import { createInterface } from "readline";
+
+import { CommandOptions, createShell, Shell } from "./shell";
 
 const debugCommands = db("clitest:commands");
 const debugOutput = db("clitest:output");
@@ -56,20 +58,28 @@ export class CliTest {
     file: string | undefined;
     lastCommandOutput: string | undefined;
     origPath: string;
+    _shell?: Shell;
     tmpDir: string;
 
     constructor(options: Options) {
         this.options = { ...defaultOptions, ...options };
         this.origPath = process.env.PATH || "";
         this.interactive(options.interactive);
-        this._updateEnv({ ...process.env, PWD: process.cwd() });
+        this.updateEnv(process.env, "");
         if (!this.origPath) throw new Error(`Environment PATH is empty. Cannot continue.`);
     }
 
     async init() {
+        if (this.tmpDir) return;
         this.tmpDir = await makeTmpdir();
-        this.cwd = this.tmpDir;
+        this.updateEnv(process.env, this.tmpDir);
+        this._shell = await createShell({ cwd: this.cwd });
         this.output(`Running in temp dir: ${this.cwd}`);
+    }
+
+    private get shell() {
+        if (!this._shell) throw new InternalError(`Must call init before use`);
+        return this._shell;
     }
 
     info: WriteFunc = (s: string) => {
@@ -82,6 +92,7 @@ export class CliTest {
     }
 
     async cleanup() {
+        this.shell.close();
         const tmpDir = this.tmpDir;
         if (this.options.cleanup) {
             this.output(`Removing temp dir: ${tmpDir}`);
@@ -144,36 +155,24 @@ export class CliTest {
         }
     }
 
-    updateEnv(output: string, diff = false): void {
-        const newEnv = this.parseEnv(output);
-        this._updateEnv(newEnv, diff);
-    }
-
-    parseEnv(output: string): NodeJS.ProcessEnv {
-        const env: NodeJS.ProcessEnv = {};
-        const envLines = output.split("\n");
-        for (const l of envLines) {
-            if (/^\s*$/.test(l)) continue;
-            const idx = l.indexOf("=");
-            if (idx >= 0) {
-                const name = l.slice(0, idx);
-                const val = l.slice(idx + 1);
-                env[name] = val;
+    async command(cmd: string, options: CommandOptions = {}) {
+        try {
+            const ret = await this.shell.command(cmd, options);
+            this.updateEnv(ret.env, ret.cwd, true);
+            return ret;
+        } catch (err) {
+            if (err.env && err.cwd) {
+                this.updateEnv(err.env, err.cwd, true);
             }
+            throw err;
         }
-        return env;
     }
 
-    private updateCwd(newCwd: string | undefined) {
-        if (!newCwd) throw new Error(`'PWD' not set in environment`);
-        if (newCwd !== this.cwd) this.output(`Changed to new cwd: '${newCwd}'`);
-        this.cwd = newCwd;
-    }
+    private updateEnv(newEnv: NodeJS.ProcessEnv, cwd: string, diff = false) {
+        if (cwd !== this.cwd && diff) this.output(`Changed to new cwd: '${cwd}'`);
+        this.cwd = cwd;
 
-    private _updateEnv(newEnv: NodeJS.ProcessEnv, diff = false) {
         const e = { ...newEnv };
-
-        this.updateCwd(e.PWD);
 
         e.PATH = this.origPath;
         delete e.PWD;
@@ -205,6 +204,12 @@ export class CliTest {
 
         this.cmdEnv = e;
     }
+}
+
+export async function createCliTest(options: Options) {
+    const ct = new CliTest(options);
+    await ct.init();
+    return ct;
 }
 
 async function makeTmpdir() {

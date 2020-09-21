@@ -3,7 +3,7 @@ import should from "should";
 import { stderr, stdout } from "stdout-stderr";
 import { Action, runActions } from "../../src/actions";
 import { exec } from "../../src/actions/exec";
-import { CliTest } from "../../src/clitest";
+import { CliTest, createCliTest } from "../../src/clitest";
 import { readString } from "../testlib";
 
 const origOutput = db.enabled("clitest:output");
@@ -34,10 +34,16 @@ function withCapture(f: Mocha.AsyncFunc): Mocha.AsyncFunc {
 describe("exec action", () => {
     const actionLineNum = 1;
     const filename = "file.md";
+    let dt: CliTest | undefined;
+
+    afterEach(async () => {
+        if (dt) await dt.cleanup();
+        dt = undefined;
+    });
 
     it("should run string cmd with shell", withCapture(async () => {
         db.enable("clitest:output");
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "exec",
             filename,
@@ -55,7 +61,7 @@ Output line
 
     it("should process array cmd", withCapture(async () => {
         db.enable("clitest:output");
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "exec",
             filename,
@@ -68,7 +74,7 @@ Output line
     }));
 
     it("should error on bad command", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "exec",
             filename,
@@ -84,7 +90,7 @@ spawn FOO ENOENT`);
     });
 
     it("should process array cmd and error", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const action: Action = {
             type: "exec",
             filename,
@@ -98,7 +104,7 @@ spawn FOO ENOENT`);
     });
 
     it("should process array cmd and error in markdown", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             '<!-- doctest exec { cmd: ["ls", "BADFILE"] } -->',
@@ -111,7 +117,7 @@ spawn FOO ENOENT`);
     });
 
     it("should validate exact exec output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             '<!-- doctest exec { cmd: "echo Some output; echo", matchRegex: "^Some output\\\\n\\\\n" } -->',
@@ -122,7 +128,7 @@ spawn FOO ENOENT`);
     });
 
     it("should fail on non-match of exec output", async () => {
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "Some text",
             '<!-- doctest exec { cmd: "echo Some output", matchRegex: "Somf" } -->',
@@ -143,7 +149,7 @@ Output:
             cmd: `if [ "$CLITEST_LAST_OUTPUT" = "Some output\n" ]; then echo MATCH; else echo NO; fi`,
             matchRegex: "MATCH",
         };
-        const dt = new CliTest({ filepath: "" });
+        dt = await createCliTest({ filepath: "" });
         const md = [
             "<!-- doctest command -->",
             "```",
