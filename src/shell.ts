@@ -34,6 +34,8 @@ function emptyOutput(): Output {
 
 const prompt = "xxxCLITESTxxx";
 
+const bashTrailer = `; printf "\\n${prompt}"`;
+
 function initConfig() {
     if (process.platform === "win32") {
         return {
@@ -48,10 +50,8 @@ function initConfig() {
         return {
             shell: "bash",
             shellArgs: [],
-            promptInit: "",
-            printCwd: "pwd\n",
-            printExitCode: "echo $?\n",
-            printEnv: "env\n",
+            printCwd: `pwd${bashTrailer}\n`,
+            printEnv: `env${bashTrailer}\n`,
         }
     }
 }
@@ -126,6 +126,13 @@ interface ShellStep {
     process: (out: Output) => Promise<void>;
 }
 
+process.on("SIGTTIN", () => {
+    console.log("SIGTTIN")
+});
+process.on("SIGTTOU", () => {
+    console.log("SIGTTOU")
+});
+
 export class Shell {
     _child?: execa.ExecaChildProcess<string>;
     exitError?: any;
@@ -155,7 +162,7 @@ export class Shell {
         processStream(child.stdout!, RegExp(`.*?\n|${prompt}`, "s"), this.onStdoutData);
         processStream(child.stderr!, RegExp(`.*?\\n`, "s"), this.onStderrData);
 
-        await this.command(config.promptInit);
+        if (config.promptInit) await this.command(config.promptInit);
     }
 
     get child() {
@@ -204,6 +211,7 @@ export class Shell {
     onStdoutData = (line: string) => {
         line = line.toString().replace(/\r\n/g, "\n");
 
+        console.log(`LINE[${line}]`)
         if (line === prompt) {
             this.foundPrompt().catch((err) => {
                 this.rejectWithInternal(err);
@@ -235,6 +243,7 @@ export class Shell {
 
     async foundPrompt() {
         const out = this.collecting;
+        console.log(out);
         this.collecting = emptyOutput();
 
         // Chomp the extra \n introduced by the prompt
@@ -260,14 +269,14 @@ export class Shell {
     commandStart = async () => {
         const cmd = this.currentCommand;
         if (!cmd) throw new InternalError("Shell has no currentCommand");
-        this.child.stdin?.write(cmd + "\n");
+        this.child.stdin?.write(cmd + `; printf "\\n${prompt} $?\\n${prompt}"\n`);
     };
     commandProcess = async (out: Output) => {
         this.commandOutput = out;
     };
 
     exitCodeStart = async () => {
-        this.child.stdin?.write(config.printExitCode);
+        if (config.printExitCode) this.child.stdin?.write(config.printExitCode);
     };
     exitCodeProcess = async (out: Output) => {
         const exitCode = parseInt(out.stdout, 10);
